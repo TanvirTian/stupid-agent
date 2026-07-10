@@ -10,16 +10,33 @@ Learning how AI agents work by building one from scratch using Python, Ollama, a
 
 No frameworks. Just the fundamentals.
 
-Progress
-Conversation Memory
+---
+
+## Quick Start
+im assuming you already have `qwen2.5:7b` downloaded in Ollama
+
+```bash
+#clone the repo
+git clone https://github.com/TanvirTian/stupid-agent.git
+cd stupid-agent
+#start ollama
+systemctl start ollama
+#start the agent
+python main.py
+```
+
+
+## Progress
+
+### Conversation Memory
 
 My stupid agent can now remember previous messages.
 
 whoaaa
 
 Before
-```bash
 
+```bash
 you: my name is Tian
 
 you: what is my name?
@@ -27,9 +44,10 @@ assistant: idk
 ```
 
 After
+
 ```bash
 you: my name is Tian
 
 you: what is my name?
-assistant: Your name is Tian
+assistant: Your name is Tian.
 ```
