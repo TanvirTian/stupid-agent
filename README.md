@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://github.com/user-attachments/assets/31615629-43fb-47cd-a9a0-6545bfd9ec4a"
        alt="Stupid-Agent"
-       width="350" height=200>
+       width="256" height=200>
 </p>
 
 # Stupid Agent
