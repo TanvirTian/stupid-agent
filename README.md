@@ -1,4 +1,4 @@
-<img width="1071" height="694" alt="Stupid-Agent05(1)" src="https://github.com/user-attachments/assets/0fe4a506-7ce3-4fdd-b10c-1bad7819b706" />
+<img width="775" height="719" alt="stupid-agent06" src="https://github.com/user-attachments/assets/31615629-43fb-47cd-a9a0-6545bfd9ec4a" />
 
 # Stupid Agent
 
