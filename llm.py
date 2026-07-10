@@ -11,15 +11,10 @@ class OllamaClient:
         self.model_name = model_name
         self.timeout = timeout
 
-    def chat(self, user_message: str) -> str:
+    def chat(self, messages: list[dict[str, str]]) -> str:
         payload = {
             "model": self.model_name,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": user_message,
-                }
-            ],
+            "messages": messages,
             "stream": False,
         }
 
