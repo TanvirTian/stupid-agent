@@ -1,13 +1,16 @@
 import time
 from llm import build_default_client
 from memory import ConversationHistory
+from tools import ToolError, read_text_file
 
 def main() -> None:
 	client =  build_default_client()
 	history = ConversationHistory()
 
-	print("basic agent: Phase 1")
+	print("Stupid-Agent")
 	print("Local model: Qwen via ollama")
+	print("Type /read notes.txt to use the files reader tool.")
+	print("Type 'clear' to reset conversation history.")
 	print("Type exit or quit to stop.\n")
 
 
@@ -22,6 +25,20 @@ def main() -> None:
 			history.clear()
 			print("Conversation history cleared\n")
 			continue
+
+		if user_msg.lower().startswith("/read"):
+			file_path = user_msg[5:].strip()
+
+			try:
+				file_content = read_text_file(file_path)
+			except ToolError as exc:
+				print(f"Tool error: {exc}\n")
+				continue 
+
+			print("Tool (file_reader):")
+			print(file_content)
+			print()
+			continue 
 
 
 		if not user_msg:
