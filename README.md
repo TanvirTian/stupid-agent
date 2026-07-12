@@ -52,7 +52,7 @@ you: what is my name?
 assistant: Your name is Tian.
 ```
 
-### Conversation Memory
+### Tool
 ```text
 Added File reading tool. 
 now my agent can read text files but only from the /files directory
