@@ -55,3 +55,8 @@ def read_text_file(user_path: str) -> str:
 
 	return content 					
 
+
+def run_tool(tool_name: str, tool_input: str) -> str:
+	if tool_name == "read_text_file":
+		return read_text_file(tool_input)
+	raise ToolError(f"Unknown tool: {tool_name}")	
