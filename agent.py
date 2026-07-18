@@ -1,4 +1,6 @@
+import json
 from dataclasses import dataclass
+from json import JSONDecodeError
 
 from llm import OllamaClient
 from memory import ConversationHistory
@@ -12,36 +14,47 @@ class ToolRequest:
     tool_input: str
 
 
-class StupidAgent:
+@dataclass(frozen=True)
+class FinalAnswer:
+    content: str
+
+
+class BasicAgent:
     def __init__(self, client: OllamaClient, history: ConversationHistory) -> None:
         self.client = client
         self.history = history
 
     def run(self, user_message: str) -> str:
         initial_messages = self._build_messages_for_user_turn(user_message)
-        first_reply = self.client.chat(initial_messages)
+        first_reply_text = self.client.chat(initial_messages)
+        first_decision = self._parse_model_reply(first_reply_text)
 
-        tool_request = self._parse_tool_request(first_reply)
+        if isinstance(first_decision, FinalAnswer):
+            self._commit_turn(user_message, first_decision.content)
+            return first_decision.content
 
-        if tool_request is None:
-            self._commit_turn(user_message, first_reply)
-            return first_reply
+        print(f"[tool] {first_decision.tool_name}({first_decision.tool_input})")
 
-        print(f"[tool] {tool_request.tool_name}({tool_request.tool_input})")
-
-        tool_output = self._execute_tool(tool_request)
+        tool_output = self._execute_tool(first_decision)
 
         final_messages = self._build_messages_with_tool_result(
             initial_messages=initial_messages,
-            assistant_tool_request=first_reply,
-            tool_request=tool_request,
+            assistant_tool_request=first_reply_text,
+            tool_request=first_decision,
             tool_output=tool_output,
         )
 
-        final_reply = self.client.chat(final_messages)
+        second_reply_text = self.client.chat(final_messages)
+        second_decision = self._parse_model_reply(second_reply_text)
 
-        self._commit_turn(user_message, final_reply)
-        return final_reply
+        if not isinstance(second_decision, FinalAnswer):
+            raise RuntimeError(
+                "Expected a final JSON answer after tool result, "
+                "but the model requested another tool."
+            )
+
+        self._commit_turn(user_message, second_decision.content)
+        return second_decision.content
 
     def _build_messages_for_user_turn(self, user_message: str) -> list[dict[str, str]]:
         return [
@@ -49,32 +62,65 @@ class StupidAgent:
             *self.history.messages_for_next_turn(user_message),
         ]
 
-    def _parse_tool_request(self, model_reply: str) -> ToolRequest | None:
-        lines = [line.strip() for line in model_reply.strip().splitlines() if line.strip()]
+    def _strip_code_fences(self, model_reply: str) -> str:
+        cleaned_reply = model_reply.strip()
 
-        if not lines:
-            return None
+        if not cleaned_reply.startswith("```"):
+            return cleaned_reply
 
-        if not lines[0].startswith("ACTION:"):
-            return None
+        lines = cleaned_reply.splitlines()
 
-        if len(lines) != 2:
-            raise RuntimeError(f"Invalid tool request format: {model_reply}")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
 
-        tool_name = lines[0][len("ACTION:"):].strip()
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
 
-        if not lines[1].startswith("ACTION_INPUT:"):
-            raise RuntimeError(f"Invalid tool request format: {model_reply}")
+        return "\n".join(lines).strip()
 
-        tool_input = lines[1][len("ACTION_INPUT:"):].strip()
+    def _parse_model_reply(self, model_reply: str) -> FinalAnswer | ToolRequest:
+        cleaned_reply = self._strip_code_fences(model_reply)
 
-        if not tool_name:
-            raise RuntimeError("Tool request is missing a tool name.")
+        try:
+            data = json.loads(cleaned_reply)
+        except JSONDecodeError as exc:
+            raise RuntimeError(f"Model did not return valid JSON: {model_reply}") from exc
 
-        if not tool_input:
-            raise RuntimeError("Tool request is missing tool input.")
+        if not isinstance(data, dict):
+            raise RuntimeError("Model response must be a JSON object.")
 
-        return ToolRequest(tool_name=tool_name, tool_input=tool_input)
+        response_type = data.get("type")
+
+        if response_type == "final":
+            content = data.get("content")
+
+            if not isinstance(content, str) or not content.strip():
+                raise RuntimeError(
+                    "Final response must include a non-empty string field 'content'."
+                )
+
+            return FinalAnswer(content=content.strip())
+
+        if response_type == "tool_call":
+            tool_name = data.get("tool_name")
+            tool_input = data.get("tool_input")
+
+            if not isinstance(tool_name, str) or not tool_name.strip():
+                raise RuntimeError(
+                    "Tool call must include a non-empty string field 'tool_name'."
+                )
+
+            if not isinstance(tool_input, str) or not tool_input.strip():
+                raise RuntimeError(
+                    "Tool call must include a non-empty string field 'tool_input'."
+                )
+
+            return ToolRequest(
+                tool_name=tool_name.strip(),
+                tool_input=tool_input.strip(),
+            )
+
+        raise RuntimeError(f"Unknown response type: {response_type}")
 
     def _execute_tool(self, tool_request: ToolRequest) -> str:
         try:
@@ -94,7 +140,7 @@ class StupidAgent:
             f"TOOL_NAME: {tool_request.tool_name}\n"
             f"TOOL_INPUT: {tool_request.tool_input}\n"
             f"TOOL_OUTPUT:\n{tool_output}\n\n"
-            "Use this result to answer the user's original request."
+            "Return a final JSON answer using this result."
         )
 
         return [
